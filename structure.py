@@ -3,6 +3,9 @@ import sys
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
+empty_checkbox_char = "⬜"
+checked_char = "✔"
+
 
 class FileSelectorApp:
     def __init__(self, root, folder_path):
@@ -13,7 +16,10 @@ class FileSelectorApp:
         self.file_states = {}
         self.selection_mode = tk.BooleanVar(value=True)
 
-        self.tree = ttk.Treeview(root, columns=("Path", "Checked"), show="tree")
+        self.tree = ttk.Treeview(root, columns=("Checked",), show="tree headings")
+        self.tree.heading("#0", text="Name")
+        self.tree.heading("Checked", text=checked_char, anchor="center")
+        self.tree.column("Checked", width=50, anchor="center")
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         # current_directory = os.getcwd()
         current_directory = folder_path
@@ -58,20 +64,19 @@ class FileSelectorApp:
         self.populate_tree(folder, "")
 
     def populate_tree(self, parent_dir, parent_node):
-        child_node = self.tree.insert(
+        node = self.tree.insert(
             parent_node,
             "end",
-            text=f"⬜ {os.path.basename(parent_dir)}",
-            values=(parent_dir,),
+            text=f"{os.path.basename(parent_dir)}",
+            values=(empty_checkbox_char,),
         )
-        self.file_states[child_node] = False
+        self.file_states[node] = False
 
         if os.path.isdir(parent_dir):
             for item in sorted(os.listdir(parent_dir)):
                 path = os.path.join(parent_dir, item)
-
                 child_node = self.tree.insert(
-                    parent_node, "end", text=f"⬜ {item}", values=(path,)
+                    node, "end", text=item, values=(empty_checkbox_char,)
                 )
                 self.file_states[child_node] = False
 
@@ -81,8 +86,9 @@ class FileSelectorApp:
     def handle_click(self, event):
         item = self.tree.identify_row(event.y)
         column = self.tree.identify_column(event.x)
+        # print(f"Column: {column}")
 
-        if not item or column != "#0":
+        if not item or column != "#1":
             return
 
         self.toggle_selection(item)
@@ -92,7 +98,9 @@ class FileSelectorApp:
         new_state = not checked
 
         self.file_states[item] = new_state
-        self.update_item_text(item, new_state)
+        self.tree.item(
+            item, values=(checked_char if new_state else empty_checkbox_char,)
+        )
 
         if self.selection_mode.get():
             self.toggle_children(item, new_state)
@@ -102,20 +110,22 @@ class FileSelectorApp:
             # current_text = self.tree.item(child, "text")
             # new_text = f"✔ {current_text[2:]}" if state else f"⬜ {current_text[2:]}"
             self.file_states[child] = state
-            self.update_item_text(child, state)
+            self.tree.item(
+                child, values=(checked_char if state else empty_checkbox_char,)
+            )
             # self.tree.item(child, text=new_text)
             self.toggle_children(child, state)
 
-    def update_item_text(self, item, state):
-        current_text = self.tree.item(item, "text")[2:]
-        new_text = f"✔ {current_text}" if state else f"⬜ {current_text}"
-        self.tree.item(item, text=new_text)
+    # def update_item_text(self, item, state):
+    #     current_text = self.tree.item(item, "text")[2:]
+    #     new_text = f"✔ {current_text}" if state else f"⬜ {current_text}"
+    #     self.tree.item(item, text=new_text)
 
     def get_selected_files(self):
         return [
-            self.tree.item(item, "values")[0]
+            self.tree.item(item, "text")
             for item, checked in self.file_states.items()
-            if checked and os.path.isfile(self.tree.item(item, "values")[0])
+            if checked
         ]
         # selected_files = []
         # for item, checked in self.file_states.items():
@@ -215,9 +225,6 @@ if __name__ == "__main__":
     for item in sys.argv:
         print(f"Argument: {str(item)}")
 
-    if len(sys.argv) > 1:
-        app = FileSelectorApp(root, sys.argv[1])
-    else:
-        app = FileSelectorApp(root, os.getcwd())
-
+    folder_path = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
+    app = FileSelectorApp(root, folder_path)
     root.mainloop()
