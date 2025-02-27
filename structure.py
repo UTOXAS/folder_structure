@@ -8,7 +8,7 @@ checked_char = "✔"
 
 
 class FileSelectorApp:
-    def __init__(self, root, folder_path):
+    def __init__(self, root):
         self.root = root
         self.root.title("Folder and File Selector")
         self.root.geometry("600x500")
@@ -16,14 +16,25 @@ class FileSelectorApp:
         self.file_states = {}
         self.selection_mode = tk.BooleanVar(value=True)
 
-        self.tree = ttk.Treeview(root, columns=("Checked",), show="tree headings")
+        self.tree = ttk.Treeview(
+            root, columns=("Checked", "FullPath"), show="tree headings"
+        )
         self.tree.heading("#0", text="Name")
         self.tree.heading("Checked", text=checked_char, anchor="center")
         self.tree.column("Checked", width=50, anchor="center")
+
+        self.tree.column("FullPath", width=0, stretch=False)
         self.tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        # current_directory = os.getcwd()
-        current_directory = folder_path
-        self.populate_tree(current_directory, "")
+        current_directory = os.getcwd()
+        # current_directory = folder_path
+        node = self.tree.insert(
+            "",
+            "end",
+            text=f"{os.path.basename(current_directory)}",
+            values=(empty_checkbox_char, current_directory),
+        )
+        self.populate_tree(current_directory, node)
+        self.file_states[node] = False
 
         y_scroll = ttk.Scrollbar(root, orient="vertical", command=self.tree.yview)
         y_scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -64,19 +75,11 @@ class FileSelectorApp:
         self.populate_tree(folder, "")
 
     def populate_tree(self, parent_dir, parent_node):
-        node = self.tree.insert(
-            parent_node,
-            "end",
-            text=f"{os.path.basename(parent_dir)}",
-            values=(empty_checkbox_char,),
-        )
-        self.file_states[node] = False
-
         if os.path.isdir(parent_dir):
             for item in sorted(os.listdir(parent_dir)):
                 path = os.path.join(parent_dir, item)
                 child_node = self.tree.insert(
-                    node, "end", text=item, values=(empty_checkbox_char,)
+                    parent_node, "end", text=item, values=(empty_checkbox_char, path)
                 )
                 self.file_states[child_node] = False
 
@@ -97,9 +100,10 @@ class FileSelectorApp:
         checked = self.file_states[item]
         new_state = not checked
 
+        full_path = self.tree.item(item, "values")[1]
         self.file_states[item] = new_state
         self.tree.item(
-            item, values=(checked_char if new_state else empty_checkbox_char,)
+            item, values=(checked_char if new_state else empty_checkbox_char, full_path)
         )
 
         if self.selection_mode.get():
@@ -110,8 +114,11 @@ class FileSelectorApp:
             # current_text = self.tree.item(child, "text")
             # new_text = f"✔ {current_text[2:]}" if state else f"⬜ {current_text[2:]}"
             self.file_states[child] = state
+
+            full_path = self.tree.item(child, "values")[1]
             self.tree.item(
-                child, values=(checked_char if state else empty_checkbox_char,)
+                child,
+                values=(checked_char if state else empty_checkbox_char, full_path),
             )
             # self.tree.item(child, text=new_text)
             self.toggle_children(child, state)
@@ -122,8 +129,9 @@ class FileSelectorApp:
     #     self.tree.item(item, text=new_text)
 
     def get_selected_files(self):
+
         return [
-            self.tree.item(item, "text")
+            self.tree.item(item, "values")[1]
             for item, checked in self.file_states.items()
             if checked
         ]
@@ -147,9 +155,11 @@ class FileSelectorApp:
         output_file = "combined_code.txt"
         with open(output_file, "w", encoding="utf-8") as outfile:
             for file_path in selected_files:
-                outfile.write(f"--- {file_path} ---\n")
-                with open(file_path, "r", encoding="utf-8") as infile:
-                    outfile.write(infile.read() + "\n\n")
+                # print(f"Attempting to open: {file_path}")
+                if os.path.isfile(file_path):
+                    outfile.write(f"--- {file_path} ---\n")
+                    with open(file_path, "r", encoding="utf-8") as infile:
+                        outfile.write(infile.read() + "\n\n")
 
         messagebox.showinfo("Success", f"Filed combined into {output_file}")
 
@@ -159,7 +169,8 @@ class FileSelectorApp:
             messagebox.showwarning("No Selection", "Please select files/folders")
             return
 
-        root_folder = os.path.commonpath(selected_items)
+        # root_folder = os.path.commonpath(selected_items)
+        root_folder = os.getcwd()
         tree_structure = self.generate_selected_tree(root_folder, selected_items)
 
         # folder = os.getcwd()
@@ -176,7 +187,7 @@ class FileSelectorApp:
         Generates a hierarchical tree structure only for selected files and folders.
         """
         tree_dict = {}
-
+        print(f"Root Folder: {root_folder}")
         for path in selected_items:
             relative_path = os.path.relpath(path, root_folder)
             parts = relative_path.split(os.sep)
@@ -222,9 +233,9 @@ class FileSelectorApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    for item in sys.argv:
-        print(f"Argument: {str(item)}")
+    # for item in sys.argv:
+    # print(f"Argument: {str(item)}")
 
-    folder_path = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
-    app = FileSelectorApp(root, folder_path)
+    # folder_path = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
+    app = FileSelectorApp(root)
     root.mainloop()
